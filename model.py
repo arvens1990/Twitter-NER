@@ -1,23 +1,15 @@
-import torch
 import numpy as np
-import pandas as pd
-import emoji
+from tqdm import tqdm
 import torch
-from transformers import AutoModel, AutoTokenizer 
+import torch
+from transformers import AutoModel, AutoTokenizer, BertweetTokenizer
 
+
+# load model and tokenizer
 bertweet = AutoModel.from_pretrained("vinai/bertweet-base")
-tokenizer = AutoTokenizer.from_pretrained("vinai/bertweet-base")
+tokenizer = BertweetTokenizer.from_pretrained("vinai/bertweet-base", normalization=True)
 
-# INPUT TWEET IS ALREADY NORMALIZED!
-# line = "SC has first two presumptive cases of coronavirus , DHEC confirms HTTPURL via @USER :cry:"
-
-# input_ids = torch.tensor([tokenizer.encode(line)])
-
-# with torch.no_grad():
-#     features = bertweet(input_ids)  # Models outputs are now tuples
-
-# print(features.last_hidden_state.shape, features.pooler_output.shape)
-
+#load data
 def load_data(filename: str):
     with open(filename, 'r') as file:
         lines = [line[:-1].split() for line in file]
@@ -31,11 +23,31 @@ def load_data(filename: str):
         samples.append(lines[start:end])
     return samples
   
+# load data
 train_samples = load_data('data/train/train.txt')
 val_samples = load_data('data/dev/dev.txt')
 samples = train_samples + val_samples
 schema = ['_'] + sorted({tag for sentence in samples for _, tag in sentence})
 
-# print(len(schema))
-# print(1)
+def tokenize_sample(sample):
+    seq = [
+               (subtoken, tag)
+               for token, tag in sample
+               for subtoken in tokenizer(token)['input_ids'][1:-1]
+           ]
+    return [(3, 'O')] + seq + [(4, 'O')]
 
+def preprocess(samples):
+    tag_index = {tag: i for i, tag in enumerate(schema)}
+    tokenized_samples = list(tqdm(map(tokenize_sample, samples)))
+    max_len = max(map(len, tokenized_samples))
+    X = np.zeros((len(samples), max_len), dtype=np.int32)
+    y = np.zeros((len(samples), max_len), dtype=np.int32)
+    for i, sentence in enumerate(tokenized_samples):
+        for j, (subtoken_id, tag) in enumerate(sentence):
+            X[i, j] = subtoken_id
+            y[i,j] = tag_index[tag]
+    return X, y
+
+X_train, y_train = preprocess(train_samples)
+X_val, y_val = preprocess(val_samples)
