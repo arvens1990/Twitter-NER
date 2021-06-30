@@ -9,7 +9,7 @@ from transformers import AutoModel, AutoTokenizer, BertweetTokenizer
 bertweet = AutoModel.from_pretrained("vinai/bertweet-base")
 tokenizer = BertweetTokenizer.from_pretrained("vinai/bertweet-base", normalization=True)
 
-#load data
+# load data
 def load_data(filename: str):
     with open(filename, 'r') as file:
         lines = [line[:-1].split() for line in file]
